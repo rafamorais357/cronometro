@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cronômetro HÁBITOS 3.5.7</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f9fafb;
+      --text: #1f2937;
+      --subtle: #6b7280;
+      --accent: #dbeafe;
+      --dark-bg: #111827;
+      --dark-text: #f3f4f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 20px;
+      text-align: center;
+      transition: background 0.3s, color 0.3s;
+      position: relative;
+    }
+
+    .dark-mode {
+      background: var(--dark-bg);
+      color: var(--dark-text);
+    }
+
+    .mode-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text);
+      transition: color 0.3s;
+    }
+
+    .dark-mode .mode-toggle {
+      color: var(--dark-text);
+    }
+
+    .progress-circle {
+      width: 220px;
+      height: 220px;
+      position: relative;
+      margin-bottom: 30px;
+    }
+
+    svg {
+      transform: rotate(-90deg);
+    }
+
+    .progress-bg {
+      stroke: var(--accent);
+    }
+
+    .progress-bar {
+      stroke: var(--primary);
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    .timer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 3rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+    }
+
+    .controls {
+      margin-bottom: 40px;
+    }
+
+    .controls button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 16px 40px;
+      margin: 6px;
+      font-size: 1.4rem;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .controls button:hover {
+      background-color: #1d4ed8;
+      transform: scale(1.05);
+    }
+
+    .set-time input {
+      width: 70px;
+      padding: 10px;
+      font-size: 1rem;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      margin: 0 5px;
+      text-align: center;
+    }
+
+    .set-time button {
+      background-color: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+      padding: 10px 20px;
+      font-size: 1rem;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .set-time button:hover {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .set-time {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .set-time label {
+      font-size: 0.95rem;
+      color: var(--subtle);
+    }
+
+    @media (max-width: 500px) {
+      .timer {
+        font-size: 2.5rem;
+      }
+
+      .controls {
+        margin-bottom: 50px;
+      }
+
+      .controls button {
+        font-size: 1.2rem;
+        padding: 14px 36px;
+      }
+
+      .set-time input {
+        width: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="mode-toggle" onclick="toggleDarkMode()">🌙</button>
+
+  <div class="progress-circle">
+    <svg width="220" height="220">
+      <circle cx="110" cy="110" r="100" stroke-width="10" fill="none" class="progress-bg" />
+      <circle id="progressBar" cx="110" cy="110" r="100" stroke-width="10" fill="none" class="progress-bar" stroke-dasharray="628" stroke-dashoffset="0" />
+    </svg>
+    <div class="timer" id="timer">05:37</div>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn" onclick="toggleTimer()">Start</button>
+  </div>
+
+  <div class="set-time">
+    <label for="min">Definir tempo:</label>
+    <input type="number" id="min" placeholder="Min" min="0" />
+    <input type="number" id="sec" placeholder="Seg" min="0" max="59" />
+    <button onclick="setCustomTime()">Aplicar</button>
+  </div>
+
+  <audio id="alertSound" src="https://raw.githubusercontent.com/rafamorais357/som-habitos/main/som-habitos.mp3"></audio>
+
+  <script>
+    let defaultMinutes = parseInt(localStorage.getItem('min')) || 5;
+    let defaultSeconds = parseInt(localStorage.getItem('sec')) || 37;
+    let totalSeconds = defaultMinutes * 60 + defaultSeconds;
+    let remainingSeconds = totalSeconds;
+    let interval = null;
+    let isRunning = false;
+
+    const timerDisplay = document.getElementById("timer");
+    const progressBar = document.getElementById("progressBar");
+    const alertSound = document.getElementById("alertSound");
+    const startBtn = document.getElementById("startBtn");
+
+    function updateDisplay() {
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      timerDisplay.textContent =
+        String(minutes).padStart(2, '0') + ":" + String(seconds).padStart(2, '0');
+      const progress = (remainingSeconds / totalSeconds) * 628;
+      progressBar.setAttribute("stroke-dashoffset", 628 - progress);
+    }
+
+    function startTimer() {
+      interval = setInterval(() => {
+        if (remainingSeconds > 0) {
+          remainingSeconds--;
+          updateDisplay();
+        } else {
+          clearInterval(interval);
+          isRunning = false;
+          startBtn.textContent = "Start";
+          alertSound.currentTime = 0;
+          alertSound.play();
+          remainingSeconds = totalSeconds;
+          updateDisplay();
+        }
+      }, 1000);
+    }
+
+    function toggleTimer() {
+      if (!isRunning) {
+        if (!alertSound.paused) {
+          alertSound.pause();
+          alertSound.currentTime = 0;
+        }
+        isRunning = true;
+        startBtn.textContent = "Return";
+        startTimer();
+      } else {
+        isRunning = false;
+        clearInterval(interval);
+        remainingSeconds = totalSeconds;
+        updateDisplay();
+        startBtn.textContent = "Start";
+        if (!alertSound.paused) {
+          alertSound.pause();
+          alertSound.currentTime = 0;
+        }
+      }
+    }
+
+    function setCustomTime() {
+      const min = parseInt(document.getElementById("min").value) || 0;
+      const sec = parseInt(document.getElementById("sec").value) || 0;
+      clearInterval(interval);
+      totalSeconds = min * 60 + sec;
+      remainingSeconds = totalSeconds;
+      defaultMinutes = min;
+      defaultSeconds = sec;
+      updateDisplay();
+      startBtn.textContent = "Start";
+      isRunning = false;
+      if (!alertSound.paused) {
+        alertSound.pause();
+        alertSound.currentTime = 0;
+      }
+      localStorage.setItem('min', min);
+      localStorage.setItem('sec', sec);
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>
